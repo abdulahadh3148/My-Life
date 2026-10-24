@@ -1,0 +1,19 @@
+{
+  "name": "MyLife OS — Personal Productivity",
+  "short_name": "MyLife OS",
+  "description": "Unified life operating system for daily routines, work, prayer, fitness, gardening, and personal growth.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F17",
+  "theme_color": "#0B0F17",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "lifestyle", "health"]
+}
