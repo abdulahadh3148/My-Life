@@ -8,20 +8,31 @@ import {
   Shield,
   Dumbbell,
   Clock,
-  Sparkles
+  Sparkles,
+  Video,
+  ExternalLink,
+  Award,
+  Zap
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { WorkoutPlayerModal } from './WorkoutPlayerModal';
+import { ExerciseVideoModal } from './ExerciseVideoModal';
 import { formatDuration, formatDisplayDate, getTodayDateString } from '../../utils/time';
-import { WorkoutPlan } from '../../types';
+import { WorkoutPlan, ExerciseItem } from '../../types';
 
 export const FitnessView: React.FC = () => {
   const { workoutPlans, workoutLogs, logWorkout } = useApp();
-  const [activePlan, setActivePlan] = useState<WorkoutPlan>(workoutPlans[0]);
+  const [activePlan, setActivePlan] = useState<WorkoutPlan>(workoutPlans[0] || {} as WorkoutPlan);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
+  const [selectedVideoExercise, setSelectedVideoExercise] = useState<ExerciseItem | null>(null);
 
   const today = getTodayDateString();
   const todayCompletedLog = workoutLogs.find((l) => l.date === today && l.completed);
+
+  const totalWorkouts = workoutLogs.filter((l) => l.completed).length;
+  const totalMinutes = workoutLogs
+    .filter((l) => l.completed)
+    .reduce((acc, curr) => acc + (curr.durationMinutes || 0), 0);
 
   const handleManualComplete = () => {
     logWorkout({
@@ -49,7 +60,7 @@ export const FitnessView: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
-              Targeted abdominal endurance, core posture, and functional stamina. Grounded in deliberate biomechanics without unrealistic fitness claims.
+              Targeted abdominal stability, posture alignment, and functional endurance. Includes video demonstrations, rest interval timers, and workout history.
             </p>
           </div>
 
@@ -71,12 +82,24 @@ export const FitnessView: React.FC = () => {
           </div>
         </div>
 
-        {/* Realistic Guidance Callout */}
-        <div className="mt-4 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2.5">
-          <Shield className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-          <span>
-            <strong>Scientific Principle:</strong> Sustainable core strength and definition require consistent progressive tension, neutral spine alignment, and whole-body metabolic conditioning. Focus on form rather than rushing repetitions.
-          </span>
+        {/* Real User Workout Statistics */}
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="p-3 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Workouts Done</span>
+            <span className="text-lg font-black text-slate-900 dark:text-white font-mono">{totalWorkouts}</span>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Total Time</span>
+            <span className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono">{totalMinutes}m</span>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Active Routine</span>
+            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate block mt-1">
+              {activePlan.title ? activePlan.title.split(' ')[0] : 'Core'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -112,7 +135,7 @@ export const FitnessView: React.FC = () => {
               {activePlan.title}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Focus: {activePlan.focusArea} • Estimated: {activePlan.estimatedMinutes} mins
+              Focus: {activePlan.focusArea} • Estimated: {activePlan.estimatedMinutes} mins • {activePlan.exercises?.length || 0} exercises
             </p>
           </div>
 
@@ -129,21 +152,21 @@ export const FitnessView: React.FC = () => {
               onClick={() => setIsPlayerOpen(true)}
               className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-all"
             >
-              Start Player
+              Start Guided Workout
             </button>
           </div>
         </div>
 
-        {/* Exercises List */}
+        {/* Exercises List with Video Demonstration Action */}
         <div className="space-y-3">
-          {activePlan.exercises.map((ex, idx) => (
+          {activePlan.exercises?.map((ex, idx) => (
             <div
               key={ex.id}
-              className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#151C2A] space-y-2"
+              className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-[#151C2A] space-y-3 transition-all hover:border-rose-400/30"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono text-xs font-bold flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono text-xs font-black flex items-center justify-center shrink-0">
                     {idx + 1}
                   </span>
                   <div>
@@ -156,17 +179,31 @@ export const FitnessView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-mono font-semibold">
-                  <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    {ex.sets} sets
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                    {ex.durationSeconds ? `${ex.durationSeconds}s` : `${ex.reps} reps`}
-                  </span>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <div className="flex items-center gap-1.5 text-xs font-mono font-semibold">
+                    <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                      {ex.sets} sets
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
+                      {ex.durationSeconds ? `${ex.durationSeconds}s` : `${ex.reps} reps`}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                      {ex.restSeconds}s rest
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedVideoExercise(ex)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-600/10 hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-400 dark:hover:text-white text-xs font-bold transition-all shadow-sm"
+                    title={`Watch demonstration video for ${ex.name}`}
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Watch Demo</span>
+                  </button>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white/60 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white/70 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
                 {ex.instructions}
               </p>
             </div>
@@ -176,32 +213,46 @@ export const FitnessView: React.FC = () => {
 
       {/* Workout History */}
       <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-[#121824]/70 backdrop-blur-md p-5 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <History className="w-4 h-4 text-rose-500" />
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            Workout History & Consistency
-          </h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-rose-500" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Workout History & Progress
+            </h3>
+          </div>
+          <span className="text-xs font-mono text-slate-400">
+            {workoutLogs.length} total logged sessions
+          </span>
         </div>
 
         <div className="space-y-2 max-h-56 overflow-y-auto">
-          {workoutLogs.map((log) => (
-            <div
-              key={log.id}
-              className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151C2A] flex items-center justify-between text-xs"
-            >
-              <div>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {log.planTitle}
-                </span>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {formatDisplayDate(log.date)} • {log.notes}
+          {workoutLogs.length === 0 ? (
+            <div className="text-center py-6 text-xs text-slate-400">
+              No workouts logged yet. Start your first guided routine above!
+            </div>
+          ) : (
+            workoutLogs.map((log) => (
+              <div
+                key={log.id}
+                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151C2A] flex items-center justify-between text-xs"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {log.planTitle}
+                  </span>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {formatDisplayDate(log.date)} • {log.notes || 'Completed full workout.'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span className="font-mono font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">
+                    {formatDuration(log.durationMinutes)}
+                  </span>
                 </div>
               </div>
-              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">
-                {formatDuration(log.durationMinutes)}
-              </span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -213,6 +264,14 @@ export const FitnessView: React.FC = () => {
           plan={activePlan}
         />
       )}
+
+      {/* Demonstration Video Modal */}
+      <ExerciseVideoModal
+        isOpen={!!selectedVideoExercise}
+        onClose={() => setSelectedVideoExercise(null)}
+        exercise={selectedVideoExercise}
+        onStartExercise={() => setIsPlayerOpen(true)}
+      />
     </div>
   );
 };

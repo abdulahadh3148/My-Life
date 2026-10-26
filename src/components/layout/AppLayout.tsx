@@ -16,6 +16,8 @@ import { GrowthView } from '../growth/GrowthView';
 import { WeeklyView } from '../weekly/WeeklyView';
 import { AnalyticsView } from '../analytics/AnalyticsView';
 import { SettingsView } from '../settings/SettingsView';
+import { FinanceView } from '../finance/FinanceView';
+import { ExplorerView } from '../explorer/ExplorerView';
 import { useApp } from '../../context/AppContext';
 
 export const AppLayout: React.FC = () => {
@@ -46,6 +48,10 @@ export const AppLayout: React.FC = () => {
         return <GardeningView />;
       case 'prayer':
         return <PrayerView />;
+      case 'finance':
+        return <FinanceView />;
+      case 'explorer':
+        return <ExplorerView />;
       case 'growth':
         return <GrowthView />;
       case 'weekly':

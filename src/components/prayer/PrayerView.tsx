@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Moon,
   Clock,
@@ -10,11 +10,15 @@ import {
   Edit2,
   Sparkles,
   CalendarCheck,
-  RefreshCw
+  RefreshCw,
+  SunMedium,
+  SlidersHorizontal
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PrayerEditModal } from './PrayerEditModal';
-import { PrayerTime } from '../../types';
+import { SriLankaCitySelector } from './SriLankaCitySelector';
+import { PrayerCountdownCard } from './PrayerCountdownCard';
+import { PrayerTime, PrayerName } from '../../types';
 import {
   formatTime,
   getTodayDateString,
@@ -22,6 +26,7 @@ import {
   minutesToTimeString,
   formatDisplayDate
 } from '../../utils/time';
+import { SriLankaCity } from '../../utils/prayerEngine';
 
 export const PrayerView: React.FC = () => {
   const {
@@ -29,56 +34,88 @@ export const PrayerView: React.FC = () => {
     prayerLogs,
     togglePrayerCompleted,
     settings,
+    updateSettings,
     addActivity,
     activities,
     updateActivity,
-    addNotification
+    addNotification,
+    setSriLankaCity,
+    setMadhab,
+    syncPrayerTimes
   } = useApp();
 
   const [editingPrayer, setEditingPrayer] = useState<PrayerTime | null>(null);
+  const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
+  const [isSyncingLive, setIsSyncingLive] = useState(false);
 
   const today = getTodayDateString();
   const todayLog = prayerLogs.find((l) => l.date === today) || {
     date: today,
     fajr: false,
+    sunrise: false,
     dhuhr: false,
     asr: false,
     maghrib: false,
     isha: false
   };
 
-  // Determine next upcoming prayer
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const handleSelectCity = (city: SriLankaCity) => {
+    if (setSriLankaCity) {
+      setSriLankaCity(city);
+    } else {
+      updateSettings({
+        sriLankaCity: city.name,
+        latitude: city.latitude,
+        longitude: city.longitude
+      });
+    }
 
-  const nextPrayer = useMemo(() => {
-    const upcoming = prayerTimes
-      .map((pt) => ({
-        ...pt,
-        minutes: parseTimeToMinutes(pt.time)
-      }))
-      .filter((pt) => pt.minutes >= currentMinutes)
-      .sort((a, b) => a.minutes - b.minutes);
+    addNotification({
+      title: 'Prayer Location Updated',
+      message: `Set to ${city.name}, Sri Lanka (${city.district} District). Timetable updated.`,
+      type: 'prayer'
+    });
+  };
 
-    return upcoming.length > 0 ? upcoming[0] : prayerTimes[0]; // Wrap around to Fajr next day
-  }, [prayerTimes, currentMinutes]);
+  const handleUpdateMadhab = (madhab: 'shafii' | 'hanafi') => {
+    if (setMadhab) {
+      setMadhab(madhab);
+    } else {
+      updateSettings({ madhab });
+    }
+  };
 
-  const minutesUntilNext = nextPrayer
-    ? parseTimeToMinutes(nextPrayer.time) - currentMinutes
-    : 0;
+  const handleLiveSync = async () => {
+    setIsSyncingLive(true);
+    try {
+      if (syncPrayerTimes) {
+        await syncPrayerTimes(true);
+      }
+      addNotification({
+        title: 'Timings Synced',
+        message: 'Synchronized with live Sri Lankan prayer timetable calculation.',
+        type: 'prayer'
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSyncingLive(false);
+    }
+  };
 
   // Sync / create prayer blocks in today's daily schedule
   const handleSyncToSchedule = () => {
     let syncedCount = 0;
 
     prayerTimes.forEach((pt) => {
-      const buffer = pt.mosqueBufferMinutes || 15;
+      // Don't create obligatory congregation buffer for sunrise unless desired
+      const buffer = pt.mosqueBufferMinutes || (pt.name === 'sunrise' ? 0 : 15);
       const prayerStartMin = parseTimeToMinutes(pt.time) - buffer;
-      const prayerEndMin = parseTimeToMinutes(pt.time) + 30; // 30 min congregation
+      const prayerEndMin = parseTimeToMinutes(pt.time) + (pt.name === 'sunrise' ? 15 : 30);
 
       const startStr = minutesToTimeString(Math.max(0, prayerStartMin));
       const endStr = minutesToTimeString(prayerEndMin);
-      const title = `${pt.label} Prayer & Mosque Buffer`;
+      const title = pt.name === 'sunrise' ? 'Sunrise / Ishraq' : `${pt.label} Prayer & Mosque Buffer`;
 
       const existing = activities.find(
         (a) => a.date === today && a.category === 'prayer' && a.title.includes(pt.label)
@@ -93,7 +130,7 @@ export const PrayerView: React.FC = () => {
       } else {
         addActivity({
           title,
-          description: `Includes ${buffer}m mosque travel and wudu buffer before prayer.`,
+          description: pt.name === 'sunrise' ? 'Astronomical sunrise and Ishraq time.' : `Includes ${buffer}m mosque travel and wudu buffer before prayer.`,
           date: today,
           startTime: startStr,
           endTime: endStr,
@@ -109,8 +146,8 @@ export const PrayerView: React.FC = () => {
     });
 
     addNotification({
-      title: 'Prayers Synced to Schedule',
-      message: `Updated fixed prayer schedule blocks with mosque buffers in your timeline.`,
+      title: 'Prayers Synced to Timeline',
+      message: `Preserved all existing tasks and updated 6 fixed prayer blocks with mosque travel buffers.`,
       type: 'prayer'
     });
   };
@@ -119,58 +156,58 @@ export const PrayerView: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-safe-nav animate-in fade-in">
-      {/* Prayer Header Banner */}
-      <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white via-emerald-50/20 to-white dark:from-[#0D1814] dark:via-[#0F1E19] dark:to-[#0A1310] p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <Moon className="w-5 h-5" />
-              </span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Daily Prayer Timetable
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
-              Configured for <strong className="text-slate-800 dark:text-slate-200">{settings.timezone}</strong>. All timings are fully editable to match your local mosque and congregation schedules.
-            </p>
-          </div>
+      {/* Live Next Prayer & Countdown Digital Clock Card */}
+      <PrayerCountdownCard
+        prayerTimes={prayerTimes}
+        cityName={settings.sriLankaCity || 'Colombo'}
+        madhab={settings.madhab || 'shafii'}
+        timeFormat={settings.timeFormat || '12h'}
+        onOpenCitySelector={() => setIsCitySelectorOpen(true)}
+      />
+
+      {/* Control Banner */}
+      <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#121824]/80 backdrop-blur-md p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsCitySelectorOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors"
+          >
+            <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Location: {settings.sriLankaCity || 'Colombo'}, Sri Lanka</span>
+            <SlidersHorizontal className="w-3 h-3 text-slate-400" />
+          </button>
+
+          <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+            Asr Rule: {settings.madhab === 'hanafi' ? 'Hanafi' : 'Shafi‘i (Standard)'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={handleLiveSync}
+            disabled={isSyncingLive}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-50"
+            title="Recalculate or sync with live AlAdhan API"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin text-emerald-500' : ''}`} />
+            <span>Recalculate / Sync</span>
+          </button>
 
           <button
             onClick={handleSyncToSchedule}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-950/20 active:scale-95 transition-all self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm active:scale-95 transition-all"
           >
-            <CalendarCheck className="w-4 h-4" />
+            <CalendarCheck className="w-3.5 h-3.5" />
             <span>Sync into Schedule Blocks</span>
           </button>
         </div>
-
-        {/* Next Prayer Callout */}
-        <div className="mt-4 p-4 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-                Next Upcoming Adhan
-              </div>
-              <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-                {nextPrayer.label} at {formatTime(nextPrayer.time, settings.timeFormat)}
-              </div>
-            </div>
-          </div>
-
-          <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 self-start sm:self-auto">
-            {minutesUntilNext > 0 ? `in ${minutesUntilNext} minutes` : 'Now approaching'}
-          </div>
-        </div>
       </div>
 
-      {/* 5 Prayers Cards */}
+      {/* 6 Prayer Times Cards (Fajr, Sunrise, Dhuhr, Asr (Shafi'i), Maghrib, Isha) */}
       <div className="space-y-3">
         {prayerTimes.map((pt) => {
           const isDone = Boolean(todayLog[pt.name]);
+          const isSunrise = pt.name === 'sunrise';
 
           return (
             <div
@@ -197,6 +234,11 @@ export const PrayerView: React.FC = () => {
 
                   <div>
                     <div className="flex items-center gap-2">
+                      {isSunrise ? (
+                        <SunMedium className="w-4 h-4 text-amber-500" />
+                      ) : (
+                        <Moon className="w-4 h-4 text-emerald-500" />
+                      )}
                       <h4
                         className={`text-base font-bold text-slate-900 dark:text-white ${
                           isDone ? 'line-through text-slate-400 dark:text-slate-500' : ''
@@ -207,14 +249,29 @@ export const PrayerView: React.FC = () => {
                       <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
                         {formatTime(pt.time, settings.timeFormat)}
                       </span>
+
+                      {pt.manualAdjustmentMinutes ? (
+                        <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                          {pt.manualAdjustmentMinutes > 0 ? `+${pt.manualAdjustmentMinutes}m` : `${pt.manualAdjustmentMinutes}m`} mosque offset
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-emerald-500" />
-                        <span>Mosque Prep Buffer: {pt.mosqueBufferMinutes}m</span>
-                      </span>
-                      <span>•</span>
+                      {!isSunrise ? (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-emerald-500" />
+                            <span>Mosque Buffer: {pt.mosqueBufferMinutes}m</span>
+                          </span>
+                          <span>•</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Shurooq / Ishraq Horizon</span>
+                          <span>•</span>
+                        </>
+                      )}
                       <span className="flex items-center gap-1">
                         {pt.reminder ? (
                           <Bell className="w-3 h-3 text-emerald-500" />
@@ -230,7 +287,7 @@ export const PrayerView: React.FC = () => {
                 <button
                   onClick={() => setEditingPrayer(pt)}
                   className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  title={`Configure ${pt.label} timings`}
+                  title={`Configure ${pt.label} timetable and mosque buffer`}
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
@@ -245,6 +302,18 @@ export const PrayerView: React.FC = () => {
         isOpen={!!editingPrayer}
         onClose={() => setEditingPrayer(null)}
         prayer={editingPrayer}
+      />
+
+      {/* Sri Lanka City & Madhab Selector Modal */}
+      <SriLankaCitySelector
+        isOpen={isCitySelectorOpen}
+        onClose={() => setIsCitySelectorOpen(false)}
+        selectedCity={settings.sriLankaCity || 'Colombo'}
+        onSelectCity={handleSelectCity}
+        madhab={settings.madhab || 'shafii'}
+        onUpdateMadhab={handleUpdateMadhab}
+        isLoading={isSyncingLive}
+        onRecalculate={handleLiveSync}
       />
     </div>
   );

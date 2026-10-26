@@ -14,11 +14,26 @@ import {
   Check,
   AlertTriangle,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  MapPin,
+  Compass,
+  FileCheck,
+  FileText,
+  AlertCircle,
+  Database,
+  Info
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
-import { exportStateAsJSON, validateImportedData } from '../../utils/storage';
+import { Modal } from '../common/Modal';
+import {
+  exportStateAsJSON,
+  validateImportedData,
+  createSafetyBackupSnapshot,
+  computeRecordCounts,
+  ValidationResult
+} from '../../utils/storage';
+import { SRI_LANKA_CITIES } from '../../utils/prayerEngine';
 import {
   requestNotificationPermission,
   getNotificationPermissionStatus
@@ -31,7 +46,9 @@ export const SettingsView: React.FC = () => {
     updateSettings,
     resetToDefaults,
     importState,
-    addNotification
+    addNotification,
+    setSriLankaCity,
+    setMadhab
   } = useApp();
 
   const [userName, setUserName] = useState(settings.userName);
@@ -47,6 +64,14 @@ export const SettingsView: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  
+  // Safe Backup & Recovery states
+  const [pendingBackup, setPendingBackup] = useState<{
+    validation: ValidationResult;
+    fileName: string;
+  } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -73,40 +98,70 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleExport = () => {
-    exportStateAsJSON(state);
-    addNotification({
-      title: 'Data Exported',
-      message: 'Full backup JSON file downloaded to your device.',
-      type: 'system'
-    });
+    try {
+      exportStateAsJSON(state);
+      addNotification({
+        title: 'Backup Downloaded',
+        message: 'A complete MyLife OS backup envelope (JSON) was saved to your device.',
+        type: 'system'
+      });
+    } catch (err) {
+      alert('Failed to export backup JSON.');
+    }
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setValidationError(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const parsed = JSON.parse(event.target?.result as string);
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
         const validation = validateImportedData(parsed);
 
-        if (validation.valid) {
-          importState(parsed);
-          addNotification({
-            title: 'Backup Restored',
-            message: 'Your MyLife OS state was successfully restored from backup.',
-            type: 'system'
+        if (validation.valid && validation.validatedState) {
+          setPendingBackup({
+            validation,
+            fileName: file.name
           });
         } else {
-          alert(`Import failed: ${validation.error}`);
+          setValidationError(validation.error || 'The uploaded file is not a valid MyLife OS backup.');
         }
       } catch (err) {
-        alert('Invalid JSON file format.');
+        setValidationError('Invalid JSON syntax: Could not parse file as JSON.');
       }
+    };
+    reader.onerror = () => {
+      setValidationError('Failed to read the selected file from disk.');
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleConfirmRestore = () => {
+    if (!pendingBackup?.validation.validatedState) return;
+
+    // 1. Download safety snapshot of current state before replacing
+    createSafetyBackupSnapshot(state);
+
+    // 2. Safely apply validated backup state
+    importState(pendingBackup.validation.validatedState);
+
+    const counts = pendingBackup.validation.recordCounts;
+    const totalRecords = counts
+      ? counts.activities + counts.incomes + counts.expenses + counts.debts + counts.explorerPlaces
+      : 0;
+
+    addNotification({
+      title: 'Backup Restored Successfully',
+      message: `State restored from "${pendingBackup.fileName}" (${totalRecords} items). An emergency safety snapshot of your previous data was saved to downloads.`,
+      type: 'system'
+    });
+
+    setPendingBackup(null);
   };
 
   const handleRequestNotif = async () => {
@@ -262,6 +317,49 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
+          {/* Sri Lanka Prayer Preferences */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-emerald-500" /> Sri Lanka Prayer City
+              </label>
+              <select
+                value={settings.sriLankaCity || 'Colombo'}
+                onChange={(e) => {
+                  const city = SRI_LANKA_CITIES.find(c => c.name === e.target.value);
+                  if (city && setSriLankaCity) {
+                    setSriLankaCity(city);
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {SRI_LANKA_CITIES.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} ({c.district} District)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
+                <Compass className="w-3.5 h-3.5 text-emerald-500" /> Asr Juristic Madhab
+              </label>
+              <select
+                value={settings.madhab || 'shafii'}
+                onChange={(e) => {
+                  if (setMadhab) {
+                    setMadhab(e.target.value as 'shafii' | 'hanafi');
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="shafii">Shafi‘i (Standard in Sri Lanka • 1x shadow)</option>
+                <option value="hanafi">Hanafi (Later Asr • 2x shadow)</option>
+              </select>
+            </div>
+          </div>
+
           {/* Preferred Work Window & Sleep / Wake times */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             <div>
@@ -332,25 +430,74 @@ export const SettingsView: React.FC = () => {
 
       {/* Data Backup & Reset Actions */}
       <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#121824]/80 backdrop-blur-md p-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-          <Download className="w-4 h-4" /> Data Portability & Safety
-        </h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <Database className="w-4 h-4 text-emerald-500" /> Local Data Portability & Safety
+          </h3>
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+            Envelope v1 • LocalStorage Verified
+          </span>
+        </div>
+
+        {/* Current State Live Breakdown */}
+        {(() => {
+          const c = computeRecordCounts(state);
+          return (
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 text-xs">
+              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" /> Current Local Records on This Device:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-600 dark:text-slate-400 text-[11px]">
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <span className="font-bold text-slate-900 dark:text-white">{c.activities}</span> Schedule Items
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <span className="font-bold text-slate-900 dark:text-white">{c.incomes + c.expenses}</span> Transactions
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <span className="font-bold text-slate-900 dark:text-white">{c.debts}</span> Debts ({c.debtPayments} Payments)
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <span className="font-bold text-slate-900 dark:text-white">{c.explorerPlaces}</span> Places ({c.explorerPhotos} Photos)
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Validation Error Alert */}
+        {validationError && (
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2.5 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold">Backup Import Rejected</p>
+              <p className="mt-0.5 text-rose-700 dark:text-rose-300">{validationError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setValidationError(null)}
+              className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Export JSON */}
           <button
             type="button"
             onClick={handleExport}
-            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:border-emerald-500 text-slate-800 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all"
+            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:border-emerald-500 text-slate-800 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all active:scale-95"
           >
             <Download className="w-4 h-4 text-emerald-500" />
-            <span>Export Backup JSON</span>
+            <span>Export Envelope JSON</span>
           </button>
 
           {/* Import JSON */}
-          <label className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:border-blue-500 text-slate-800 dark:text-slate-200 font-semibold text-xs shadow-sm cursor-pointer transition-all">
+          <label className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:border-blue-500 text-slate-800 dark:text-slate-200 font-semibold text-xs shadow-sm cursor-pointer transition-all active:scale-95">
             <Upload className="w-4 h-4 text-blue-500" />
-            <span>Import Backup JSON</span>
+            <span>Restore From Backup</span>
             <input
               type="file"
               ref={fileInputRef}
@@ -364,13 +511,131 @@ export const SettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsResetConfirmOpen(true)}
-            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs shadow-sm transition-all"
+            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs shadow-sm transition-all active:scale-95"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Reset Demo State</span>
           </button>
         </div>
       </div>
+
+      {/* Restore Confirmation & Review Modal */}
+      {pendingBackup && (
+        <Modal
+          isOpen={Boolean(pendingBackup)}
+          onClose={() => setPendingBackup(null)}
+          title="Review & Confirm Backup Restore"
+          subtitle={`Selected file: ${pendingBackup.fileName}`}
+          maxWidth="max-w-xl"
+        >
+          <div className="space-y-4 p-1 text-slate-800 dark:text-slate-200">
+            {/* Format Banner */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+              <div className="flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-emerald-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  {pendingBackup.validation.isLegacy ? 'Legacy Backup Format' : 'Versioned Envelope v1'}
+                </span>
+              </div>
+              {pendingBackup.validation.exportedAt && (
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  {new Date(pendingBackup.validation.exportedAt).toLocaleDateString()} {new Date(pendingBackup.validation.exportedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+
+            {/* Warnings if any */}
+            {pendingBackup.validation.warnings && pendingBackup.validation.warnings.length > 0 && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" /> Notices:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                  {pendingBackup.validation.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Counts Breakdown Grid */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Verified Records to be Restored:
+              </p>
+              {(() => {
+                const c = pendingBackup.validation.recordCounts;
+                if (!c) return null;
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Schedule</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">{c.activities} Items</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Finance</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">
+                        {c.incomes + c.expenses} Records
+                      </p>
+                      <p className="text-[10px] text-slate-500">({c.incomes} inc, {c.expenses} exp)</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Debts</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">{c.debts} Ledgers</p>
+                      <p className="text-[10px] text-slate-500">({c.debtPayments} payments)</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Explorer</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">{c.explorerPlaces} Places</p>
+                      <p className="text-[10px] text-slate-500">({c.explorerPhotos} photos)</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Gardening</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">{c.plants} Plants</p>
+                      <p className="text-[10px] text-slate-500">({c.gardeningTasks} tasks)</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Fitness & Growth</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white mt-0.5">{c.workoutPlans + c.growthGoals} Routines</p>
+                      <p className="text-[10px] text-slate-500">({c.dailyHabits} habits)</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Safety Guarantee Callout */}
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs flex items-start gap-2.5">
+              <ShieldCheck className="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" />
+              <div>
+                <p className="font-bold">Zero-Risk Safety Guarantee</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed">
+                  Before replacing your current state, an emergency safety snapshot of your active records will be automatically downloaded to your device. You can revert anytime.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setPendingBackup(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Save Snapshot & Confirm Restore</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Reset Confirmation Dialog */}
       <ConfirmDialog

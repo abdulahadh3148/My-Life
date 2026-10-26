@@ -17,7 +17,13 @@ import {
   WorkoutPlan,
   WorkSession,
   WorkTask,
-  AppNotification
+  AppNotification,
+  IncomeRecord,
+  ExpenseRecord,
+  DebtRecord,
+  DebtPayment,
+  ExplorerPlace,
+  PlacePhoto
 } from '../types';
 import {
   AppStateData,
@@ -28,6 +34,7 @@ import {
 import { getTodayDateString, addDays, getStartOfWeek } from '../utils/time';
 import { applyAdjustments } from '../utils/timeBalancer';
 import { triggerSystemNotification } from '../utils/notifications';
+import { SriLankaCity, fetchLivePrayerTimes, buildPrayerTimesList } from '../utils/prayerEngine';
 
 export type NavView =
   | 'dashboard'
@@ -39,7 +46,9 @@ export type NavView =
   | 'growth'
   | 'weekly'
   | 'analytics'
-  | 'settings';
+  | 'settings'
+  | 'finance'
+  | 'explorer';
 
 interface AppContextType {
   // Navigation & Date
@@ -76,6 +85,10 @@ interface AppContextType {
   prayerLogs: PrayerLog[];
   weeklyReview: WeeklyReviewNote;
   notifications: AppNotification[];
+  incomes: IncomeRecord[];
+  expenses: ExpenseRecord[];
+  debts: DebtRecord[];
+  explorerPlaces: ExplorerPlace[];
 
   // Computed
   todayActivities: Activity[];
@@ -110,9 +123,32 @@ interface AppContextType {
   toggleGardeningTask: (id: string) => void;
   addGardeningTask: (task: Omit<GardeningTask, 'id'>) => void;
 
-  // Actions: Prayer
+  // Actions: Prayer & Sri Lanka
   togglePrayerCompleted: (name: PrayerName, date?: string) => void;
   updatePrayerTime: (name: PrayerName, updates: Partial<PrayerTime>) => void;
+  setSriLankaCity: (city: SriLankaCity) => Promise<void>;
+  setMadhab: (madhab: 'shafii' | 'hanafi') => Promise<void>;
+  syncPrayerTimes: (forceApi?: boolean) => Promise<void>;
+
+  // Actions: Finance
+  addIncome: (record: Omit<IncomeRecord, 'id' | 'createdAt'>) => void;
+  updateIncome: (id: string, updates: Partial<IncomeRecord>) => void;
+  deleteIncome: (id: string) => void;
+  addExpense: (record: Omit<ExpenseRecord, 'id' | 'createdAt'>) => void;
+  updateExpense: (id: string, updates: Partial<ExpenseRecord>) => void;
+  deleteExpense: (id: string) => void;
+  addDebt: (debt: Omit<DebtRecord, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'payments'>) => void;
+  updateDebt: (id: string, updates: Partial<DebtRecord>) => void;
+  deleteDebt: (id: string) => void;
+  addDebtPayment: (debtId: string, payment: Omit<DebtPayment, 'id'>) => void;
+  deleteDebtPayment: (debtId: string, paymentId: string) => void;
+
+  // Actions: Sri Lanka Explorer
+  addExplorerPlace: (place: Omit<ExplorerPlace, 'id' | 'createdAt'>) => void;
+  updateExplorerPlace: (id: string, updates: Partial<ExplorerPlace>) => void;
+  deleteExplorerPlace: (id: string) => void;
+  addPlacePhoto: (placeId: string, photo: Omit<PlacePhoto, 'id' | 'uploadedAt'>) => void;
+  deletePlacePhoto: (placeId: string, photoId: string) => void;
 
   // Actions: Growth
   addGrowthGoal: (goal: Omit<GrowthGoal, 'id'>) => void;
@@ -482,6 +518,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const freshLog: PrayerLog = {
           date: dateStr,
           fajr: false,
+          sunrise: false,
           dhuhr: false,
           asr: false,
           maghrib: false,
@@ -502,6 +539,237 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setState(prev => ({
       ...prev,
       prayerTimes: prev.prayerTimes.map(pt => (pt.name === name ? { ...pt, ...updates } : pt))
+    }));
+  };
+
+  const setSriLankaCity = async (city: SriLankaCity) => {
+    const madhab = state.settings.madhab || 'shafii';
+    const calculated = await fetchLivePrayerTimes(city.name, city.latitude, city.longitude, new Date(), madhab);
+    const updatedPrayerTimes = buildPrayerTimesList(calculated, undefined, state.prayerTimes, madhab);
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        sriLankaCity: city.name,
+        latitude: city.latitude,
+        longitude: city.longitude,
+        timezone: 'Asia/Colombo'
+      },
+      prayerTimes: updatedPrayerTimes
+    }));
+  };
+
+  const setMadhab = async (madhab: 'shafii' | 'hanafi') => {
+    const city = state.settings.sriLankaCity || 'Colombo';
+    const lat = state.settings.latitude || 6.9271;
+    const lng = state.settings.longitude || 79.8612;
+    const calculated = await fetchLivePrayerTimes(city, lat, lng, new Date(), madhab);
+    const updatedPrayerTimes = buildPrayerTimesList(calculated, undefined, state.prayerTimes, madhab);
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        madhab
+      },
+      prayerTimes: updatedPrayerTimes
+    }));
+  };
+
+  const syncPrayerTimes = async (forceApi: boolean = false) => {
+    const city = state.settings.sriLankaCity || 'Colombo';
+    const lat = state.settings.latitude || 6.9271;
+    const lng = state.settings.longitude || 79.8612;
+    const madhab = state.settings.madhab || 'shafii';
+
+    const calculated = await fetchLivePrayerTimes(city, lat, lng, new Date(), madhab);
+    const updatedPrayerTimes = buildPrayerTimesList(calculated, undefined, state.prayerTimes, madhab);
+
+    setState(prev => ({
+      ...prev,
+      prayerTimes: updatedPrayerTimes
+    }));
+  };
+
+  // Finance Actions
+  const addIncome = (data: Omit<IncomeRecord, 'id' | 'createdAt'>) => {
+    const newIncome: IncomeRecord = {
+      ...data,
+      id: `inc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString()
+    };
+    setState(prev => ({ ...prev, incomes: [newIncome, ...(prev.incomes || [])] }));
+    addNotification({
+      title: 'Income Recorded',
+      message: `Added Rs. ${data.amount.toLocaleString()} from ${data.source}.`,
+      type: 'system'
+    });
+  };
+
+  const updateIncome = (id: string, updates: Partial<IncomeRecord>) => {
+    setState(prev => ({
+      ...prev,
+      incomes: (prev.incomes || []).map(i => i.id === id ? { ...i, ...updates } : i)
+    }));
+  };
+
+  const deleteIncome = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      incomes: (prev.incomes || []).filter(i => i.id !== id)
+    }));
+  };
+
+  const addExpense = (data: Omit<ExpenseRecord, 'id' | 'createdAt'>) => {
+    const newExpense: ExpenseRecord = {
+      ...data,
+      id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString()
+    };
+    setState(prev => ({ ...prev, expenses: [newExpense, ...(prev.expenses || [])] }));
+    addNotification({
+      title: 'Expense Recorded',
+      message: `Recorded Rs. ${data.amount.toLocaleString()} for ${data.category}.`,
+      type: 'system'
+    });
+  };
+
+  const updateExpense = (id: string, updates: Partial<ExpenseRecord>) => {
+    setState(prev => ({
+      ...prev,
+      expenses: (prev.expenses || []).map(e => e.id === id ? { ...e, ...updates } : e)
+    }));
+  };
+
+  const deleteExpense = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      expenses: (prev.expenses || []).filter(e => e.id !== id)
+    }));
+  };
+
+  const addDebt = (data: Omit<DebtRecord, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'payments'>) => {
+    const newDebt: DebtRecord = {
+      ...data,
+      id: `debt-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      paidAmount: 0,
+      status: 'pending',
+      payments: [],
+      createdAt: new Date().toISOString()
+    };
+    setState(prev => ({ ...prev, debts: [newDebt, ...(prev.debts || [])] }));
+  };
+
+  const updateDebt = (id: string, updates: Partial<DebtRecord>) => {
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).map(d => {
+        if (d.id !== id) return d;
+        const updated = { ...d, ...updates };
+        const paid = updated.paidAmount || 0;
+        updated.status = paid >= updated.originalAmount ? 'settled' : paid > 0 ? 'partially_paid' : 'pending';
+        return updated;
+      })
+    }));
+  };
+
+  const deleteDebt = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).filter(d => d.id !== id)
+    }));
+  };
+
+  const addDebtPayment = (debtId: string, paymentData: Omit<DebtPayment, 'id'>) => {
+    const newPayment: DebtPayment = {
+      ...paymentData,
+      id: `pay-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
+    };
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).map(d => {
+        if (d.id !== debtId) return d;
+        const payments = [...(d.payments || []), newPayment];
+        const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+        const status = paidAmount >= d.originalAmount ? 'settled' : 'partially_paid';
+        return { ...d, payments, paidAmount, status };
+      })
+    }));
+    addNotification({
+      title: 'Payment Logged',
+      message: `Recorded payment of Rs. ${paymentData.amount.toLocaleString()}.`,
+      type: 'system'
+    });
+  };
+
+  const deleteDebtPayment = (debtId: string, paymentId: string) => {
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).map(d => {
+        if (d.id !== debtId) return d;
+        const payments = (d.payments || []).filter(p => p.id !== paymentId);
+        const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+        const status = paidAmount >= d.originalAmount ? 'settled' : paidAmount > 0 ? 'partially_paid' : 'pending';
+        return { ...d, payments, paidAmount, status };
+      })
+    }));
+  };
+
+  // Sri Lanka Explorer Actions
+  const addExplorerPlace = (placeData: Omit<ExplorerPlace, 'id' | 'createdAt'>) => {
+    const newPlace: ExplorerPlace = {
+      ...placeData,
+      id: `place-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString()
+    };
+    setState(prev => ({
+      ...prev,
+      explorerPlaces: [newPlace, ...(prev.explorerPlaces || [])]
+    }));
+    addNotification({
+      title: 'Destination Added',
+      message: `Added ${placeData.title} to your Sri Lanka Explorer Journal.`,
+      type: 'system'
+    });
+  };
+
+  const updateExplorerPlace = (id: string, updates: Partial<ExplorerPlace>) => {
+    setState(prev => ({
+      ...prev,
+      explorerPlaces: (prev.explorerPlaces || []).map(p =>
+        p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
+      )
+    }));
+  };
+
+  const deleteExplorerPlace = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      explorerPlaces: (prev.explorerPlaces || []).filter(p => p.id !== id)
+    }));
+  };
+
+  const addPlacePhoto = (placeId: string, photoData: Omit<PlacePhoto, 'id' | 'uploadedAt'>) => {
+    const newPhoto: PlacePhoto = {
+      ...photoData,
+      id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      uploadedAt: new Date().toISOString()
+    };
+    setState(prev => ({
+      ...prev,
+      explorerPlaces: (prev.explorerPlaces || []).map(p =>
+        p.id === placeId ? { ...p, photos: [...(p.photos || []), newPhoto] } : p
+      )
+    }));
+  };
+
+  const deletePlacePhoto = (placeId: string, photoId: string) => {
+    setState(prev => ({
+      ...prev,
+      explorerPlaces: (prev.explorerPlaces || []).map(p =>
+        p.id === placeId ? { ...p, photos: (p.photos || []).filter(ph => ph.id !== photoId) } : p
+      )
     }));
   };
 
@@ -720,6 +988,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         prayerLogs: state.prayerLogs,
         weeklyReview: state.weeklyReview,
         notifications: state.notifications,
+        incomes: state.incomes || [],
+        expenses: state.expenses || [],
+        debts: state.debts || [],
+        explorerPlaces: state.explorerPlaces || [],
 
         todayActivities,
         todayCompletedCount,
@@ -751,6 +1023,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         togglePrayerCompleted,
         updatePrayerTime,
+        setSriLankaCity,
+        setMadhab,
+        syncPrayerTimes,
+
+        addIncome,
+        updateIncome,
+        deleteIncome,
+        addExpense,
+        updateExpense,
+        deleteExpense,
+        addDebt,
+        updateDebt,
+        deleteDebt,
+        addDebtPayment,
+        deleteDebtPayment,
+
+        addExplorerPlace,
+        updateExplorerPlace,
+        deleteExplorerPlace,
+        addPlacePhoto,
+        deletePlacePhoto,
 
         addGrowthGoal,
         logGrowthSession,

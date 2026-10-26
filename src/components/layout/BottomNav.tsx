@@ -12,7 +12,9 @@ import {
   BarChart2,
   Settings,
   MoreHorizontal,
-  X
+  X,
+  Wallet,
+  Compass
 } from 'lucide-react';
 import { useApp, NavView } from '../../context/AppContext';
 
@@ -21,9 +23,11 @@ export const BottomNav: React.FC = () => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const moreItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'prayer', label: 'Prayer Times', icon: Moon },
+    { id: 'finance', label: 'Finance & Debts', icon: Wallet },
+    { id: 'explorer', label: 'SL Explorer', icon: Compass },
     { id: 'fitness', label: 'Fitness & Core', icon: Flame },
     { id: 'gardening', label: 'Gardening', icon: Sprout },
-    { id: 'prayer', label: 'Prayer Times', icon: Moon },
     { id: 'growth', label: 'Personal Growth', icon: GraduationCap },
     { id: 'weekly', label: 'Weekly Planner', icon: CalendarDays },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },

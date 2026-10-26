@@ -6,6 +6,8 @@ import { StatusPillsWidget } from './StatusPillsWidget';
 import { TodayTimelineSnippet } from './TodayTimelineSnippet';
 import { DailyHabitsWidget } from './DailyHabitsWidget';
 import { WeeklyGoalsWidget } from './WeeklyGoalsWidget';
+import { QuickFinanceWidget } from './QuickFinanceWidget';
+import { ExplorerQuickWidget } from './ExplorerQuickWidget';
 
 export const DashboardView: React.FC = () => {
   return (
@@ -15,6 +17,12 @@ export const DashboardView: React.FC = () => {
 
       {/* Prayer Tracker Strip */}
       <PrayerStrip />
+
+      {/* Finance & Sri Lanka Explorer Highlights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <QuickFinanceWidget />
+        <ExplorerQuickWidget />
+      </div>
 
       {/* Work Focus & Daily Health/Garden Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

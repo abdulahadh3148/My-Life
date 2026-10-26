@@ -91,6 +91,9 @@ export interface ExerciseItem {
   durationSeconds?: number;
   restSeconds: number;
   completed?: boolean;
+  videoUrl?: string;
+  videoSourceTitle?: string;
+  techniqueCues?: string[];
 }
 
 export interface WorkoutPlan {
@@ -137,7 +140,7 @@ export interface GardeningTask {
   completed: boolean;
 }
 
-export type PrayerName = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+export type PrayerName = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 
 export interface PrayerTime {
   name: PrayerName;
@@ -145,11 +148,13 @@ export interface PrayerTime {
   time: string; // "HH:mm"
   mosqueBufferMinutes: number; // Prep + travel buffer before/after
   reminder: boolean;
+  manualAdjustmentMinutes?: number;
 }
 
 export interface PrayerLog {
   date: string;
   fajr: boolean;
+  sunrise?: boolean;
   dhuhr: boolean;
   asr: boolean;
   maghrib: boolean;
@@ -210,6 +215,12 @@ export interface UserSettings {
   mosqueTravelBufferMinutes: number;
   notificationsEnabled: boolean;
   breakReminderMinutes: number;
+  // Sri Lanka Prayer Settings
+  sriLankaCity?: string;
+  latitude?: number;
+  longitude?: number;
+  calculationMethod?: string;
+  madhab?: 'shafii' | 'hanafi';
 }
 
 export interface AppNotification {
@@ -229,3 +240,8 @@ export interface WeeklyReviewNote {
   actionItems: string;
   updatedAt: string;
 }
+
+// Re-export finance and explorer types
+export * from './finance';
+export * from './explorer';
+

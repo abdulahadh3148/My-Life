@@ -157,15 +157,21 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   sleepTime: '22:30',
   mosqueTravelBufferMinutes: 15,
   notificationsEnabled: true,
-  breakReminderMinutes: 45
+  breakReminderMinutes: 45,
+  sriLankaCity: 'Colombo',
+  latitude: 6.9271,
+  longitude: 79.8612,
+  calculationMethod: 'MWL (Muslim World League)',
+  madhab: 'shafii'
 };
 
 export const DEFAULT_PRAYER_TIMES: PrayerTime[] = [
-  { name: 'fajr', label: 'Fajr', time: '05:00', mosqueBufferMinutes: 15, reminder: true },
-  { name: 'dhuhr', label: 'Dhuhr', time: '12:15', mosqueBufferMinutes: 15, reminder: true },
-  { name: 'asr', label: 'Asr', time: '15:30', mosqueBufferMinutes: 15, reminder: true },
-  { name: 'maghrib', label: 'Maghrib', time: '18:05', mosqueBufferMinutes: 15, reminder: true },
-  { name: 'isha', label: 'Isha', time: '19:20', mosqueBufferMinutes: 15, reminder: true }
+  { name: 'fajr', label: 'Fajr', time: '04:58', mosqueBufferMinutes: 15, reminder: true },
+  { name: 'sunrise', label: 'Sunrise', time: '06:08', mosqueBufferMinutes: 0, reminder: false },
+  { name: 'dhuhr', label: 'Dhuhr', time: '12:12', mosqueBufferMinutes: 15, reminder: true },
+  { name: 'asr', label: 'Asr (Shafi‘i)', time: '15:28', mosqueBufferMinutes: 15, reminder: true },
+  { name: 'maghrib', label: 'Maghrib', time: '18:11', mosqueBufferMinutes: 15, reminder: true },
+  { name: 'isha', label: 'Isha', time: '19:22', mosqueBufferMinutes: 15, reminder: true }
 ];
 
 export function getInitialActivities(): Activity[] {
