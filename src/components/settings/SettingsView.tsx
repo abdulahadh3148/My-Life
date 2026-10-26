@@ -21,7 +21,10 @@ import {
   FileText,
   AlertCircle,
   Database,
-  Info
+  Info,
+  Cloud,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -48,7 +51,13 @@ export const SettingsView: React.FC = () => {
     importState,
     addNotification,
     setSriLankaCity,
-    setMadhab
+    setMadhab,
+    currentUser,
+    isCloudSyncing,
+    lastSyncedAt,
+    loginWithGoogle,
+    logout,
+    syncWithCloud
   } = useApp();
 
   const [userName, setUserName] = useState(settings.userName);
@@ -186,6 +195,101 @@ export const SettingsView: React.FC = () => {
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Customize your profile, daily time targets, notifications, themes, and backup data.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cloud Account & Realtime Sync Card */}
+      <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-slate-50 to-white dark:from-emerald-950/30 dark:via-[#121824] dark:to-[#0B0F17] p-5 sm:p-6 shadow-sm backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+              <Cloud className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Google Cloud Sync & Backup
+                </h3>
+                {currentUser ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Cloud Synced
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                    Local Device Only
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
+                {currentUser
+                  ? `Signed in as ${currentUser.displayName || currentUser.email}. All schedules, prayer logs, finances, and places are continuously backed up to your private Google Cloud account.`
+                  : 'Connect your Google account to automatically synchronize all data, photos, and routines across your phone, tablet, and laptop for free.'}
+              </p>
+              {lastSyncedAt && currentUser && (
+                <div className="text-[11px] text-slate-400 font-mono mt-1 flex items-center gap-1.5">
+                  <Clock className="w-3 h-3 text-emerald-500" />
+                  <span>Last synced with cloud: {lastSyncedAt}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            {currentUser ? (
+              <>
+                <button
+                  type="button"
+                  onClick={syncWithCloud}
+                  disabled={isCloudSyncing}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isCloudSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-400 font-semibold text-xs transition-all"
+                  title="Sign out from Google Cloud"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={loginWithGoogle}
+                disabled={isCloudSyncing}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs transition-all shadow-md active:scale-95 disabled:opacity-50"
+              >
+                {isCloudSyncing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                )}
+                <span>Sign in with Google</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

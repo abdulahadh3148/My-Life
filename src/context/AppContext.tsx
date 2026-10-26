@@ -23,8 +23,16 @@ import {
   DebtRecord,
   DebtPayment,
   ExplorerPlace,
-  PlacePhoto
+  PlacePhoto,
+  CloudUserProfile
 } from '../types';
+import {
+  signInWithGoogle,
+  signOutUser,
+  onAuthChange,
+  saveUserDataToCloud,
+  loadUserDataFromCloud
+} from '../services/firebase';
 import {
   AppStateData,
   loadStoredState,
@@ -172,6 +180,14 @@ interface AppContextType {
   addNotification: (notif: { title: string; message: string; type: AppNotification['type'] }) => void;
   resetToDefaults: () => void;
   importState: (data: AppStateData) => void;
+
+  // Cloud Auth & Sync
+  currentUser: CloudUserProfile | null;
+  isCloudSyncing: boolean;
+  lastSyncedAt: string | null;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  syncWithCloud: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -186,6 +202,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isBalancerOpen, setIsBalancerOpen] = useState(false);
   const [isPwaPromptOpen, setIsPwaPromptOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+
+  // Cloud Authentication & Sync
+  const [currentUser, setCurrentUser] = useState<CloudUserProfile | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(state.settings.lastCloudSync || null);
 
   // Synchronize state to localStorage on modification
   useEffect(() => {
@@ -954,6 +975,135 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     saveStateToStorage(newData);
   };
 
+  // Monitor Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthChange(async (user) => {
+      if (user) {
+        const profile: CloudUserProfile = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL
+        };
+        setCurrentUser(profile);
+
+        // Fetch cloud data and merge
+        try {
+          setIsCloudSyncing(true);
+          const cloudData = await loadUserDataFromCloud(user.uid);
+          if (cloudData && typeof cloudData === 'object' && cloudData.version) {
+            setState((prev) => ({
+              ...prev,
+              ...cloudData,
+              settings: {
+                ...prev.settings,
+                ...(cloudData.settings || {}),
+                userName: user.displayName || prev.settings.userName,
+                cloudSyncEnabled: true,
+                lastCloudSync: new Date().toISOString()
+              }
+            }));
+            setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            addNotification({
+              title: 'Cloud Data Connected',
+              message: `Welcome, ${user.displayName || 'Abdul'}! Your cloud data is connected.`,
+              type: 'system'
+            });
+          } else {
+            // First time: backup current local state to cloud
+            await saveUserDataToCloud(user.uid, state);
+            setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            addNotification({
+              title: 'Cloud Backup Active',
+              message: 'Your current records and places are backed up to Google Cloud Firestore.',
+              type: 'system'
+            });
+          }
+        } catch (err) {
+          console.error('Error syncing with Firebase Cloud:', err);
+        } finally {
+          setIsCloudSyncing(false);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Continuous auto-sync when state updates while logged in (debounced by 2.5s)
+  useEffect(() => {
+    if (!currentUser) return;
+    const timer = setTimeout(() => {
+      saveUserDataToCloud(currentUser.uid, state)
+        .then(() => {
+          setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        })
+        .catch((err) => {
+          console.warn('Auto cloud sync issue:', err);
+        });
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [state, currentUser]);
+
+  const loginWithGoogle = async () => {
+    try {
+      setIsCloudSyncing(true);
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error('Google Sign-in failed:', err);
+      addNotification({
+        title: 'Sign In Failed',
+        message: err.message || 'Could not complete Google Sign-In. Please check pop-up permissions.',
+        type: 'system'
+      });
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOutUser();
+      setCurrentUser(null);
+      addNotification({
+        title: 'Logged Out',
+        message: 'You have signed out from Google Cloud. Local data remains safe on this device.',
+        type: 'system'
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const syncWithCloud = async () => {
+    if (!currentUser) {
+      await loginWithGoogle();
+      return;
+    }
+    try {
+      setIsCloudSyncing(true);
+      await saveUserDataToCloud(currentUser.uid, state);
+      setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      addNotification({
+        title: 'Cloud Sync Complete',
+        message: 'All your schedules, prayer logs, finances, and places are safely saved in Google Cloud.',
+        type: 'system'
+      });
+    } catch (err: any) {
+      console.error('Manual sync failed:', err);
+      addNotification({
+        title: 'Cloud Sync Failed',
+        message: err.message || 'Failed to sync with cloud. Check internet connection.',
+        type: 'system'
+      });
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1062,7 +1212,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         clearAllNotifications,
         addNotification,
         resetToDefaults,
-        importState
+        importState,
+
+        currentUser,
+        isCloudSyncing,
+        lastSyncedAt,
+        loginWithGoogle,
+        logout,
+        syncWithCloud
       }}
     >
       {children}

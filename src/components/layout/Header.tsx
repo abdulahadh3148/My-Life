@@ -6,7 +6,8 @@ import {
   Plus,
   SlidersHorizontal,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Cloud
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatDisplayDate, getGreeting } from '../../utils/time';
@@ -25,7 +26,9 @@ export const Header: React.FC = () => {
     setIsNotificationCenterOpen,
     setIsQuickAddOpen,
     setIsBalancerOpen,
-    setIsPwaPromptOpen
+    setIsPwaPromptOpen,
+    currentUser,
+    setActiveView
   } = useApp();
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -144,6 +147,26 @@ export const Header: React.FC = () => {
             ) : (
               <Moon className="w-4 h-4 text-slate-600" />
             )}
+          </button>
+
+          {/* Cloud Sync Status Pill */}
+          <button
+            onClick={() => setActiveView('settings')}
+            className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+              currentUser
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-500/40'
+            }`}
+            title={currentUser ? `Cloud Synced as ${currentUser.displayName || currentUser.email}` : 'Click to connect Google Cloud'}
+          >
+            {currentUser?.photoURL ? (
+              <img src={currentUser.photoURL} alt="" className="w-4 h-4 rounded-full object-cover" />
+            ) : (
+              <Cloud className={`w-3.5 h-3.5 ${currentUser ? 'text-emerald-500' : 'text-slate-400'}`} />
+            )}
+            <span className="hidden md:inline text-[11px] font-bold">
+              {currentUser ? 'Cloud Synced' : 'Sync'}
+            </span>
           </button>
 
           {/* Quick Add Button */}

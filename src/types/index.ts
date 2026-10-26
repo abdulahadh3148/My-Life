@@ -221,6 +221,15 @@ export interface UserSettings {
   longitude?: number;
   calculationMethod?: string;
   madhab?: 'shafii' | 'hanafi';
+  cloudSyncEnabled?: boolean;
+  lastCloudSync?: string;
+}
+
+export interface CloudUserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
 }
 
 export interface AppNotification {
