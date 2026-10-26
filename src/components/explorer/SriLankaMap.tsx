@@ -7,6 +7,7 @@ interface SriLankaMapProps {
   selectedPlaceId?: string | null;
   onSelectPlace: (place: ExplorerPlace) => void;
   onMapClickCoordinates?: (lat: number, lng: number) => void;
+  clickedCoords?: { lat: number; lng: number } | null;
   isPinPlacingMode?: boolean;
 }
 
@@ -21,6 +22,7 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
   selectedPlaceId,
   onSelectPlace,
   onMapClickCoordinates,
+  clickedCoords,
   isPinPlacingMode = false
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -150,49 +152,217 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
           ? '#F59E0B' // amber
           : '#3B82F6'; // blue
 
-      const iconHtml = `
-        <div style="
-          background-color: ${color};
-          width: ${isSelected ? '32px' : '26px'};
-          height: ${isSelected ? '32px' : '26px'};
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid white;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-          transform: translate(-50%, -50%);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        ">
-          <span style="color: white; font-size: ${isSelected ? '14px' : '11px'}; font-weight: bold;">
-            ${place.status === 'favourite' ? '★' : place.status === 'visited' ? '✓' : '●'}
-          </span>
-        </div>
-      `;
+      const hasPhoto = place.photos && place.photos.length > 0 && Boolean(place.photos[0]?.url);
+      const firstPhotoUrl = hasPhoto ? place.photos[0].url : '';
+
+      const pinSize = isSelected ? 48 : 38;
+      const totalHeight = pinSize + 10;
+
+      let iconHtml = '';
+      if (hasPhoto) {
+        // High-end Photo Map Pin with downward pointer
+        iconHtml = `
+          <div style="
+            position: relative;
+            width: ${pinSize}px;
+            height: ${totalHeight}px;
+            cursor: pointer;
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.45));
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            user-select: none;
+            transform: translate(-50%, -100%);
+          ">
+            <!-- Circular Photo Disc -->
+            <div style="
+              width: ${pinSize}px;
+              height: ${pinSize}px;
+              border-radius: 50%;
+              border: 3px solid ${color};
+              box-shadow: 0 0 0 2px white, inset 0 0 0 1px rgba(0,0,0,0.2);
+              background-color: #0f172a;
+              background-image: url('${firstPhotoUrl}');
+              background-size: cover;
+              background-position: center;
+              position: relative;
+              overflow: hidden;
+            ">
+              ${place.rating ? `
+                <div style="
+                  position: absolute;
+                  bottom: 0px;
+                  right: 0px;
+                  background: #F59E0B;
+                  color: white;
+                  font-size: 8px;
+                  font-weight: 800;
+                  padding: 1px 3px;
+                  border-radius: 4px;
+                  border: 1px solid white;
+                  line-height: 1;
+                ">★${place.rating}</div>
+              ` : ''}
+            </div>
+
+            <!-- Pointer Triangle Pin -->
+            <div style="
+              position: absolute;
+              bottom: 0px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 6px solid transparent;
+              border-right: 6px solid transparent;
+              border-top: 8px solid ${color};
+            "></div>
+
+            <!-- Pulsing dot if selected -->
+            ${isSelected ? `
+              <div style="
+                position: absolute;
+                bottom: -3px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: ${color};
+                box-shadow: 0 0 12px ${color};
+              "></div>
+            ` : ''}
+          </div>
+        `;
+      } else {
+        // Fallback Pin with Status Icon
+        iconHtml = `
+          <div style="
+            position: relative;
+            width: ${isSelected ? 34 : 28}px;
+            height: ${isSelected ? 42 : 36}px;
+            cursor: pointer;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
+            user-select: none;
+            transform: translate(-50%, -100%);
+          ">
+            <div style="
+              background-color: ${color};
+              width: ${isSelected ? 34 : 28}px;
+              height: ${isSelected ? 34 : 28}px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 2px solid white;
+              box-shadow: 0 0 0 1px ${color}, 0 4px 10px rgba(0,0,0,0.25);
+            ">
+              <span style="color: white; font-size: ${isSelected ? '14px' : '11px'}; font-weight: bold;">
+                ${place.status === 'favourite' ? '★' : place.status === 'visited' ? '✓' : '●'}
+              </span>
+            </div>
+            <div style="
+              position: absolute;
+              bottom: 0px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 5px solid transparent;
+              border-right: 5px solid transparent;
+              border-top: 7px solid ${color};
+            "></div>
+          </div>
+        `;
+      }
 
       const customIcon = L.divIcon({
-        className: 'custom-map-marker',
+        className: 'custom-photo-pin-container',
         html: iconHtml,
-        iconSize: [isSelected ? 32 : 26, isSelected ? 32 : 26],
-        iconAnchor: [isSelected ? 16 : 13, isSelected ? 16 : 13]
+        iconSize: [pinSize, totalHeight],
+        iconAnchor: [pinSize / 2, totalHeight]
       });
 
       const marker = L.marker([place.latitude, place.longitude], { icon: customIcon });
 
-      marker.on('click', () => {
+      marker.on('click', (e: any) => {
+        L.DomEvent.stopPropagation(e);
         onSelectPlace(place);
       });
 
-      // Tooltip
-      marker.bindTooltip(`<strong>${place.title}</strong><br/><span style="font-size:10px; opacity:0.8">${place.district} • ${place.status.replace('_', ' ')}</span>`, {
+      // Rich Tooltip with Photo preview, Title, Height/Elevation, District
+      const elevHtml = place.elevationMeters ? `<span style="background:#e2e8f0;color:#0f172a;font-weight:700;padding:1px 5px;border-radius:4px;font-size:10px;">🏔️ ${place.elevationMeters}m</span>` : '';
+      const tooltipContent = `
+        <div style="display:flex;align-items:center;gap:8px;padding:3px;min-width:140px;font-family:system-ui,-apple-system,sans-serif;">
+          ${hasPhoto ? `<img src="${firstPhotoUrl}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid #cbd5e1;flex-shrink:0;" />` : ''}
+          <div>
+            <div style="font-weight:800;font-size:12px;color:#0f172a;line-height:1.2;">${place.title}</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;display:flex;align-items:center;gap:4px;">
+              <span>${place.district}</span>
+              ${elevHtml}
+            </div>
+          </div>
+        </div>
+      `;
+
+      marker.bindTooltip(tooltipContent, {
         direction: 'top',
-        offset: [0, -10]
+        offset: [0, -(totalHeight - 5)]
       });
 
       marker.addTo(markersLayer);
     });
-  }, [places, selectedPlaceId, mapLoaded]);
+
+    // Render clicked location pulsing marker
+    if (clickedCoords && clickedCoords.lat && clickedCoords.lng) {
+      const clickIconHtml = `
+        <div style="
+          position: relative;
+          width: 32px;
+          height: 42px;
+          filter: drop-shadow(0 6px 14px rgba(16,185,129,0.7));
+          transform: translate(-50%, -100%);
+        ">
+          <div style="
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #10B981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 800;
+            border: 2px solid white;
+            box-shadow: 0 0 0 3px #10B981;
+          ">+</div>
+          <div style="
+            position: absolute;
+            bottom: 0px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 10px solid #10B981;
+          "></div>
+        </div>
+      `;
+      const clickIcon = L.divIcon({
+        className: 'clicked-location-marker',
+        html: clickIconHtml,
+        iconSize: [32, 42],
+        iconAnchor: [16, 42]
+      });
+      const clickMarker = L.marker([clickedCoords.lat, clickedCoords.lng], { icon: clickIcon });
+      clickMarker.bindTooltip('<strong>📍 Clicked Location</strong><br/><span style="font-size:10px;">Click to Add Place & Photo</span>', {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -42]
+      });
+      clickMarker.addTo(markersLayer);
+    }
+  }, [places, selectedPlaceId, clickedCoords, mapLoaded]);
 
   // Center on selected place if changed
   useEffect(() => {

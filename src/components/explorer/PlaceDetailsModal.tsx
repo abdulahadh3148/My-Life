@@ -10,7 +10,8 @@ import {
   Camera,
   Share2,
   Compass,
-  Sparkles
+  Sparkles,
+  Mountain
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { ExplorerPlace } from '../../types/explorer';
@@ -143,6 +144,13 @@ export const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
             <span className="text-xs font-bold text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-full bg-slate-200/60 dark:bg-slate-800 capitalize">
               {place.category}
             </span>
+
+            {place.elevationMeters !== undefined && (
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 font-mono">
+                <Mountain className="w-3.5 h-3.5" />
+                <span>{place.elevationMeters}m</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-xs">
@@ -162,17 +170,26 @@ export const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
           </div>
         </div>
 
-        {/* Coordinates Callout */}
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold">
-            <MapPin className="w-4 h-4 text-emerald-500" />
+        {/* Coordinates & Elevation Callout */}
+        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold font-mono">
+            <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>
               {place.latitude.toFixed(4)}° N, {place.longitude.toFixed(4)}° E
             </span>
           </div>
-          <span className="text-slate-400 text-[11px] font-sans">
-            {place.district} District • {place.province} Province
-          </span>
+
+          <div className="flex items-center gap-3">
+            {place.elevationMeters !== undefined && (
+              <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold font-mono text-xs">
+                <Mountain className="w-3.5 h-3.5" />
+                <span>{place.elevationMeters}m ({Math.round(place.elevationMeters * 3.28084)} ft ASL)</span>
+              </div>
+            )}
+            <span className="text-slate-400 text-[11px] font-sans">
+              {place.district} District • {place.province} Province
+            </span>
+          </div>
         </div>
 
         {/* Description */}

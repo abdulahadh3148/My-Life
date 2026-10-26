@@ -30,6 +30,7 @@ export interface ExplorerPlace {
   rating?: number; // 1 to 5
   latitude: number;
   longitude: number;
+  elevationMeters?: number; // Height above sea level in meters (auto-detected)
   visitDate?: string; // YYYY-MM-DD
   photos: PlacePhoto[];
   createdAt: string;

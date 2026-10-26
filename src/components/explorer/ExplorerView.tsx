@@ -12,7 +12,8 @@ import {
   Sparkles,
   Navigation,
   Layers,
-  Heart
+  Heart,
+  Mountain
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SriLankaMap } from './SriLankaMap';
@@ -86,11 +87,9 @@ export const ExplorerView: React.FC = () => {
 
   const handleMapClick = (lat: number, lng: number) => {
     setMapClickedCoords({ lat, lng });
-    if (isPinPlacingMode) {
-      setIsPinPlacingMode(false);
-      setEditingPlace(null);
-      setIsAddModalOpen(true);
-    }
+    setIsPinPlacingMode(false);
+    setEditingPlace(null);
+    setIsAddModalOpen(true);
   };
 
   const handleSavePlace = (placeData: Omit<ExplorerPlace, 'id' | 'createdAt'>, id?: string) => {
@@ -185,12 +184,26 @@ export const ExplorerView: React.FC = () => {
         </div>
       </div>
 
+      {/* Interactive Map Helper Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-1.5 font-medium">
+          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span><strong>Quick Map Pinning:</strong> Tap or click anywhere on the map to drop a pin, auto-detect altitude, and upload photos!</span>
+        </div>
+        {mapClickedCoords && (
+          <div className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+            📍 Selected: {mapClickedCoords.lat.toFixed(4)}°N, {mapClickedCoords.lng.toFixed(4)}°E
+          </div>
+        )}
+      </div>
+
       {/* Interactive Map Component */}
       <SriLankaMap
         places={filteredPlaces}
         selectedPlaceId={selectedPlace?.id}
         onSelectPlace={(place) => setSelectedPlace(place)}
         onMapClickCoordinates={handleMapClick}
+        clickedCoords={mapClickedCoords}
         isPinPlacingMode={isPinPlacingMode}
       />
 
@@ -325,9 +338,17 @@ export const ExplorerView: React.FC = () => {
                   )}
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="capitalize font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {place.category}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="capitalize font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {place.category}
+                      </span>
+                      {place.elevationMeters !== undefined && (
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[10px] flex items-center gap-0.5">
+                          <Mountain className="w-3 h-3" />
+                          <span>{place.elevationMeters}m</span>
+                        </span>
+                      )}
+                    </div>
                     {place.visitDate && (
                       <span>Visited {formatDisplayDate(place.visitDate)}</span>
                     )}
