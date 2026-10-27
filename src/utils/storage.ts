@@ -107,6 +107,37 @@ export function getInitialState(): AppStateData {
   };
 }
 
+// Legacy mock/dummy identifiers that should never be shown to real users
+const MOCK_EXPLORER_IDS = new Set([
+  'place-sigiriya',
+  'place-galle',
+  'place-ella',
+  'place-mirissa',
+  'place-yala',
+  'place-horton',
+  'place-jaffna',
+  'place-arugam'
+]);
+
+const MOCK_FINANCE_IDS = new Set([
+  'inc-1', 'inc-2', 'inc-3',
+  'exp-1', 'exp-2', 'exp-3', 'exp-4', 'exp-5',
+  'debt-1', 'debt-2', 'debt-3',
+  'pay-1', 'pay-2'
+]);
+
+const MOCK_ACTIVITY_REGEX = /^act-(1[0-6]?|[1-9])$/;
+const MOCK_PLANT_REGEX = /^plant-[1-9]$/;
+const MOCK_GTASK_REGEX = /^gt(ask)?-[1-9]$/;
+const MOCK_WORK_TASK_REGEX = /^(wt|task)-[1-9]$/;
+const MOCK_WORK_SESSION_REGEX = /^(ws|session)-[1-9]$/;
+const MOCK_GROWTH_GOAL_REGEX = /^(gg-[1-9]|goal-(react|fitness|gardening))$/;
+const MOCK_GROWTH_SESSION_REGEX = /^gs-[1-9]$/;
+const MOCK_HABIT_REGEX = /^(hab(it)?-[1-9]|habit-(quran|workout|code|sleep|water))$/;
+const MOCK_WEEKLY_GOAL_REGEX = /^wg-[1-9]$/;
+const MOCK_WORKOUT_LOG_REGEX = /^(wlog|wl|log)-[1-9]$/;
+const MOCK_PRAYER_LOG_REGEX = /^plog-[1-9]$/;
+
 export function loadStoredState(): AppStateData {
   if (typeof window === 'undefined') return getInitialState();
   try {
@@ -117,7 +148,7 @@ export function loadStoredState(): AppStateData {
     
     // Merge safely with initial state to handle any new fields
     const initial = getInitialState();
-    return {
+    const cleanedState: AppStateData = {
       version: parsed.version || 1,
       settings: {
         ...initial.settings,
@@ -125,25 +156,42 @@ export function loadStoredState(): AppStateData {
         madhab: parsed.settings?.madhab || 'shafii'
       },
       prayerTimes: Array.isArray(parsed.prayerTimes) && parsed.prayerTimes.length ? parsed.prayerTimes : initial.prayerTimes,
-      activities: Array.isArray(parsed.activities) ? parsed.activities : initial.activities,
-      plants: Array.isArray(parsed.plants) ? parsed.plants : initial.plants,
-      gardeningTasks: Array.isArray(parsed.gardeningTasks) ? parsed.gardeningTasks : initial.gardeningTasks,
+      activities: (Array.isArray(parsed.activities) ? parsed.activities : initial.activities)
+        .filter((a: any) => !MOCK_ACTIVITY_REGEX.test(a?.id || '')),
+      plants: (Array.isArray(parsed.plants) ? parsed.plants : initial.plants)
+        .filter((p: any) => !MOCK_PLANT_REGEX.test(p?.id || '')),
+      gardeningTasks: (Array.isArray(parsed.gardeningTasks) ? parsed.gardeningTasks : initial.gardeningTasks)
+        .filter((t: any) => !MOCK_GTASK_REGEX.test(t?.id || '')),
       workoutPlans: Array.isArray(parsed.workoutPlans) ? parsed.workoutPlans : initial.workoutPlans,
-      workoutLogs: Array.isArray(parsed.workoutLogs) ? parsed.workoutLogs : initial.workoutLogs,
-      workTasks: Array.isArray(parsed.workTasks) ? parsed.workTasks : initial.workTasks,
-      workSessions: Array.isArray(parsed.workSessions) ? parsed.workSessions : initial.workSessions,
-      growthGoals: Array.isArray(parsed.growthGoals) ? parsed.growthGoals : initial.growthGoals,
-      growthSessions: Array.isArray(parsed.growthSessions) ? parsed.growthSessions : initial.growthSessions,
-      dailyHabits: Array.isArray(parsed.dailyHabits) ? parsed.dailyHabits : initial.dailyHabits,
-      weeklyGoals: Array.isArray(parsed.weeklyGoals) ? parsed.weeklyGoals : initial.weeklyGoals,
-      prayerLogs: Array.isArray(parsed.prayerLogs) ? parsed.prayerLogs : initial.prayerLogs,
-      weeklyReview: parsed.weeklyReview || initial.weeklyReview,
+      workoutLogs: (Array.isArray(parsed.workoutLogs) ? parsed.workoutLogs : initial.workoutLogs)
+        .filter((l: any) => !MOCK_WORKOUT_LOG_REGEX.test(l?.id || '')),
+      workTasks: (Array.isArray(parsed.workTasks) ? parsed.workTasks : initial.workTasks)
+        .filter((t: any) => !MOCK_WORK_TASK_REGEX.test(t?.id || '')),
+      workSessions: (Array.isArray(parsed.workSessions) ? parsed.workSessions : initial.workSessions)
+        .filter((s: any) => !MOCK_WORK_SESSION_REGEX.test(s?.id || '')),
+      growthGoals: (Array.isArray(parsed.growthGoals) ? parsed.growthGoals : initial.growthGoals)
+        .filter((g: any) => !MOCK_GROWTH_GOAL_REGEX.test(g?.id || '')),
+      growthSessions: (Array.isArray(parsed.growthSessions) ? parsed.growthSessions : initial.growthSessions)
+        .filter((s: any) => !MOCK_GROWTH_SESSION_REGEX.test(s?.id || '')),
+      dailyHabits: (Array.isArray(parsed.dailyHabits) ? parsed.dailyHabits : initial.dailyHabits)
+        .filter((h: any) => !MOCK_HABIT_REGEX.test(h?.id || '')),
+      weeklyGoals: (Array.isArray(parsed.weeklyGoals) ? parsed.weeklyGoals : initial.weeklyGoals)
+        .filter((g: any) => !MOCK_WEEKLY_GOAL_REGEX.test(g?.id || '')),
+      prayerLogs: (Array.isArray(parsed.prayerLogs) ? parsed.prayerLogs : initial.prayerLogs)
+        .filter((l: any) => !MOCK_PRAYER_LOG_REGEX.test(l?.id || '')),
+      weeklyReview: parsed.weeklyReview && parsed.weeklyReview.highlights ? parsed.weeklyReview : initial.weeklyReview,
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications : initial.notifications,
-      incomes: Array.isArray(parsed.incomes) ? parsed.incomes : initial.incomes,
-      expenses: Array.isArray(parsed.expenses) ? parsed.expenses : initial.expenses,
-      debts: Array.isArray(parsed.debts) ? parsed.debts : initial.debts,
-      explorerPlaces: Array.isArray(parsed.explorerPlaces) ? parsed.explorerPlaces : initial.explorerPlaces
+      incomes: (Array.isArray(parsed.incomes) ? parsed.incomes : initial.incomes)
+        .filter((i: any) => !MOCK_FINANCE_IDS.has(i?.id || '')),
+      expenses: (Array.isArray(parsed.expenses) ? parsed.expenses : initial.expenses)
+        .filter((e: any) => !MOCK_FINANCE_IDS.has(e?.id || '')),
+      debts: (Array.isArray(parsed.debts) ? parsed.debts : initial.debts)
+        .filter((d: any) => !MOCK_FINANCE_IDS.has(d?.id || '')),
+      explorerPlaces: (Array.isArray(parsed.explorerPlaces) ? parsed.explorerPlaces : initial.explorerPlaces)
+        .filter((p: any) => !MOCK_EXPLORER_IDS.has(p?.id || ''))
     };
+
+    return cleanedState;
   } catch (err) {
     console.error('Failed to load MyLife OS state from localStorage:', err);
     return getInitialState();

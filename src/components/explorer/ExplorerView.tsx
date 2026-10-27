@@ -359,8 +359,32 @@ export const ExplorerView: React.FC = () => {
           })}
 
           {filteredPlaces.length === 0 && (
-            <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-              No destinations match your search or filter. Click Add Destination to add your favorite Sri Lankan place!
+            <div className="col-span-full text-center py-16 px-4 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 text-slate-400 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <Compass className="w-7 h-7" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                {searchQuery ? 'No matching destinations found' : 'No Destinations Pinned Yet'}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                {searchQuery
+                  ? 'Try searching a different Sri Lankan town, district, or attraction.'
+                  : 'Click anywhere on the Sri Lanka map above or tap the button below to upload your first travel photo and pin your visited place!'}
+              </p>
+              {!searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPlace(null);
+                    setMapClickedCoords(null);
+                    setIsAddModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/20 active:scale-95 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Pin Your First Place & Photo</span>
+                </button>
+              )}
             </div>
           )}
         </div>
