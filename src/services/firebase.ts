@@ -12,9 +12,14 @@ import {
   doc,
   setDoc,
   getDoc,
+  collection,
+  getDocs,
+  deleteDoc,
+  updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
 import { AppStateData } from '../utils/storage';
+import { ManagedUser } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAO6Jxsa8y-_fi0R1zmhgGEUDeBIgWwJNk",
@@ -136,3 +141,163 @@ export function compressImageFile(file: File, maxDimension = 1280, quality = 0.8
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Register or update logged-in user in user management registry
+ */
+export async function recordUserLogin(
+  user: User,
+  stats?: { placesCount?: number; activitiesCount?: number }
+): Promise<ManagedUser> {
+  const email = user.email || 'user@mylife.app';
+  const displayName = user.displayName || email.split('@')[0];
+  const photoURL = user.photoURL || null;
+  const isDefaultAdmin = email.toLowerCase().includes('abdul') || email.toLowerCase().includes('ahad') || email.toLowerCase().includes('admin');
+
+  const now = new Date().toISOString();
+  let existingUser: ManagedUser | null = null;
+
+  // 1. Check local storage cache
+  try {
+    const rawLocal = localStorage.getItem('mylife_admin_users');
+    if (rawLocal) {
+      const users: ManagedUser[] = JSON.parse(rawLocal);
+      existingUser = users.find(u => u.uid === user.uid) || null;
+    }
+  } catch (e) {
+    console.error('Failed to read local users directory', e);
+  }
+
+  // 2. Check Firestore
+  try {
+    const userDocRef = doc(db, 'users_registry', user.uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      existingUser = snap.data() as ManagedUser;
+    }
+  } catch (e) {
+    console.warn('Could not read user from Firestore users_registry, using local/fallback', e);
+  }
+
+  const managedUser: ManagedUser = {
+    uid: user.uid,
+    email,
+    displayName,
+    photoURL,
+    role: existingUser?.role || (isDefaultAdmin ? 'admin' : 'user'),
+    status: existingUser?.status || 'active',
+    createdAt: existingUser?.createdAt || now,
+    lastLoginAt: now,
+    placesCount: stats?.placesCount ?? existingUser?.placesCount ?? 0,
+    activitiesCount: stats?.activitiesCount ?? existingUser?.activitiesCount ?? 0
+  };
+
+  // 3. Save to Firestore
+  try {
+    const userDocRef = doc(db, 'users_registry', user.uid);
+    await setDoc(userDocRef, managedUser, { merge: true });
+  } catch (e) {
+    console.warn('Could not save user to Firestore users_registry', e);
+  }
+
+  // 4. Update local storage cache
+  try {
+    const rawLocal = localStorage.getItem('mylife_admin_users');
+    let users: ManagedUser[] = rawLocal ? JSON.parse(rawLocal) : [];
+    const index = users.findIndex(u => u.uid === user.uid);
+    if (index >= 0) {
+      users[index] = managedUser;
+    } else {
+      users.unshift(managedUser);
+    }
+    localStorage.setItem('mylife_admin_users', JSON.stringify(users));
+  } catch (e) {
+    console.error('Failed to write local users directory', e);
+  }
+
+  return managedUser;
+}
+
+/**
+ * Fetch all registered users for Admin panel
+ */
+export async function getManagedUsersFromCloud(): Promise<ManagedUser[]> {
+  let list: ManagedUser[] = [];
+
+  // Try Firestore first
+  try {
+    const colRef = collection(db, 'users_registry');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      list = snap.docs.map(d => d.data() as ManagedUser);
+    }
+  } catch (e) {
+    console.warn('Could not fetch users_registry from Firestore, using local cache', e);
+  }
+
+  // Fallback to local storage if empty or offline
+  if (list.length === 0) {
+    try {
+      const rawLocal = localStorage.getItem('mylife_admin_users');
+      if (rawLocal) {
+        list = JSON.parse(rawLocal);
+      }
+    } catch (e) {
+      console.error('Error reading mylife_admin_users', e);
+    }
+  }
+
+  // Sort by lastLoginAt descending
+  return list.sort((a, b) => new Date(b.lastLoginAt).getTime() - new Date(a.lastLoginAt).getTime());
+}
+
+/**
+ * Update user role or status from Admin panel
+ */
+export async function updateManagedUserInCloud(uid: string, updates: Partial<ManagedUser>): Promise<void> {
+  // Update Firestore
+  try {
+    const userDocRef = doc(db, 'users_registry', uid);
+    await updateDoc(userDocRef, updates);
+  } catch (e) {
+    console.warn('Failed to update user in Firestore users_registry', e);
+  }
+
+  // Update local storage
+  try {
+    const rawLocal = localStorage.getItem('mylife_admin_users');
+    if (rawLocal) {
+      let users: ManagedUser[] = JSON.parse(rawLocal);
+      users = users.map(u => u.uid === uid ? { ...u, ...updates } : u);
+      localStorage.setItem('mylife_admin_users', JSON.stringify(users));
+    }
+  } catch (e) {
+    console.error('Failed to update user in local storage', e);
+  }
+}
+
+/**
+ * Delete a user from Admin panel
+ */
+export async function deleteManagedUserFromCloud(uid: string): Promise<void> {
+  // Delete from Firestore
+  try {
+    const userDocRef = doc(db, 'users_registry', uid);
+    await deleteDoc(userDocRef);
+  } catch (e) {
+    console.warn('Failed to delete user in Firestore users_registry', e);
+  }
+
+  // Delete from local storage
+  try {
+    const rawLocal = localStorage.getItem('mylife_admin_users');
+    if (rawLocal) {
+      let users: ManagedUser[] = JSON.parse(rawLocal);
+      users = users.filter(u => u.uid !== uid);
+      localStorage.setItem('mylife_admin_users', JSON.stringify(users));
+    }
+  } catch (e) {
+    console.error('Failed to delete user in local storage', e);
+  }
+}
+

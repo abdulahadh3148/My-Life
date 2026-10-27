@@ -15,7 +15,8 @@ import {
   SlidersHorizontal,
   Sparkles,
   Wallet,
-  Compass
+  Compass,
+  ShieldCheck
 } from 'lucide-react';
 import { useApp, NavView } from '../../context/AppContext';
 import { detectOverlaps } from '../../utils/timeBalancer';
@@ -45,6 +46,7 @@ export const Sidebar: React.FC = () => {
     { id: 'growth', label: 'Personal Growth', icon: GraduationCap },
     { id: 'weekly', label: 'Weekly Planner', icon: CalendarDays },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+    { id: 'admin', label: 'Admin Panel', icon: ShieldCheck, badge: 'Users' },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 

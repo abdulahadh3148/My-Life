@@ -31,7 +31,8 @@ import {
   signOutUser,
   onAuthChange,
   saveUserDataToCloud,
-  loadUserDataFromCloud
+  loadUserDataFromCloud,
+  recordUserLogin
 } from '../services/firebase';
 import {
   AppStateData,
@@ -56,7 +57,8 @@ export type NavView =
   | 'analytics'
   | 'settings'
   | 'finance'
-  | 'explorer';
+  | 'explorer'
+  | 'admin';
 
 interface AppContextType {
   // Navigation & Date
@@ -982,11 +984,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
       if (user) {
+        let userRole: 'admin' | 'user' = 'user';
+        try {
+          const rec = await recordUserLogin(user, {
+            placesCount: state.explorerPlaces.length,
+            activitiesCount: state.activities.length
+          });
+          userRole = rec.role;
+        } catch (e) {
+          console.warn('Could not record user login:', e);
+        }
+
         const profile: CloudUserProfile = {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
-          photoURL: user.photoURL
+          photoURL: user.photoURL,
+          role: userRole
         };
         setCurrentUser(profile);
 

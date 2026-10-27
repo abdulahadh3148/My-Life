@@ -19,6 +19,7 @@ import { SettingsView } from '../settings/SettingsView';
 import { FinanceView } from '../finance/FinanceView';
 import { ExplorerView } from '../explorer/ExplorerView';
 import { LoginModal } from '../auth/LoginModal';
+import { AdminView } from '../admin/AdminView';
 import { useApp } from '../../context/AppContext';
 
 export const AppLayout: React.FC = () => {
@@ -63,6 +64,8 @@ export const AppLayout: React.FC = () => {
         return <AnalyticsView />;
       case 'settings':
         return <SettingsView />;
+      case 'admin':
+        return <AdminView />;
       default:
         return <DashboardView />;
     }

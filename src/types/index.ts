@@ -230,6 +230,20 @@ export interface CloudUserProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  role?: 'admin' | 'user';
+}
+
+export interface ManagedUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string | null;
+  role: 'admin' | 'user';
+  status: 'active' | 'suspended';
+  createdAt: string;
+  lastLoginAt: string;
+  placesCount?: number;
+  activitiesCount?: number;
 }
 
 export interface AppNotification {

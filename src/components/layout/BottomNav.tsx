@@ -14,7 +14,8 @@ import {
   MoreHorizontal,
   X,
   Wallet,
-  Compass
+  Compass,
+  ShieldCheck
 } from 'lucide-react';
 import { useApp, NavView } from '../../context/AppContext';
 
@@ -31,6 +32,7 @@ export const BottomNav: React.FC = () => {
     { id: 'growth', label: 'Personal Growth', icon: GraduationCap },
     { id: 'weekly', label: 'Weekly Planner', icon: CalendarDays },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+    { id: 'admin', label: 'Admin Panel', icon: ShieldCheck },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
