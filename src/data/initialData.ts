@@ -143,7 +143,7 @@ export const CATEGORIES: Record<ActivityCategory, CategoryMeta> = {
 };
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  userName: 'User',
+  userName: 'Guest',
   avatar: '👤',
   bio: '',
   theme: 'dark',

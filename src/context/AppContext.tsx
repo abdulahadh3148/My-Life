@@ -74,6 +74,8 @@ interface AppContextType {
   setIsPwaPromptOpen: (open: boolean) => void;
   isNotificationCenterOpen: boolean;
   setIsNotificationCenterOpen: (open: boolean) => void;
+  isLoginModalOpen: boolean;
+  setIsLoginModalOpen: (open: boolean) => void;
 
   // Core Data
   state: AppStateData;
@@ -202,6 +204,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isBalancerOpen, setIsBalancerOpen] = useState(false);
   const [isPwaPromptOpen, setIsPwaPromptOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Cloud Authentication & Sync
   const [currentUser, setCurrentUser] = useState<CloudUserProfile | null>(null);
@@ -987,6 +990,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
         setCurrentUser(profile);
 
+        const googleName = user.displayName || user.email?.split('@')[0] || 'User';
+
         // Fetch cloud data and merge
         try {
           setIsCloudSyncing(true);
@@ -998,7 +1003,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               settings: {
                 ...prev.settings,
                 ...(cloudData.settings || {}),
-                userName: user.displayName || prev.settings.userName,
+                userName: googleName,
                 cloudSyncEnabled: true,
                 lastCloudSync: new Date().toISOString()
               }
@@ -1006,16 +1011,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
             addNotification({
               title: 'Cloud Data Connected',
-              message: `Welcome, ${user.displayName || 'Abdul'}! Your cloud data is connected.`,
+              message: `Welcome, ${googleName}! Your cloud data is connected.`,
               type: 'system'
             });
           } else {
             // First time: backup current local state to cloud
-            await saveUserDataToCloud(user.uid, state);
+            setState((prev) => ({
+              ...prev,
+              settings: {
+                ...prev.settings,
+                userName: googleName,
+                cloudSyncEnabled: true,
+                lastCloudSync: new Date().toISOString()
+              }
+            }));
+            await saveUserDataToCloud(user.uid, {
+              ...state,
+              settings: {
+                ...state.settings,
+                userName: googleName,
+                cloudSyncEnabled: true,
+                lastCloudSync: new Date().toISOString()
+              }
+            });
             setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
             addNotification({
               title: 'Cloud Backup Active',
-              message: 'Your current records and places are backed up to Google Cloud Firestore.',
+              message: `Welcome, ${googleName}! Your data is backed up to Google Cloud.`,
               type: 'system'
             });
           }
@@ -1068,6 +1090,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await signOutUser();
       setCurrentUser(null);
+      setState(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          userName: 'Guest',
+          cloudSyncEnabled: false
+        }
+      }));
       addNotification({
         title: 'Logged Out',
         message: 'You have signed out from Google Cloud. Local data remains safe on this device.',
@@ -1120,6 +1150,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsPwaPromptOpen,
         isNotificationCenterOpen,
         setIsNotificationCenterOpen,
+        isLoginModalOpen,
+        setIsLoginModalOpen,
 
         state,
         settings: state.settings,

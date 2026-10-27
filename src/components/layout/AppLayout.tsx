@@ -18,6 +18,7 @@ import { AnalyticsView } from '../analytics/AnalyticsView';
 import { SettingsView } from '../settings/SettingsView';
 import { FinanceView } from '../finance/FinanceView';
 import { ExplorerView } from '../explorer/ExplorerView';
+import { LoginModal } from '../auth/LoginModal';
 import { useApp } from '../../context/AppContext';
 
 export const AppLayout: React.FC = () => {
@@ -31,6 +32,8 @@ export const AppLayout: React.FC = () => {
     setIsPwaPromptOpen,
     isNotificationCenterOpen,
     setIsNotificationCenterOpen,
+    isLoginModalOpen,
+    setIsLoginModalOpen,
     selectedDate
   } = useApp();
 
@@ -102,6 +105,11 @@ export const AppLayout: React.FC = () => {
       <PwaPromptModal
         isOpen={isPwaPromptOpen}
         onClose={() => setIsPwaPromptOpen(false)}
+      />
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
       />
     </div>
   );

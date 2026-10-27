@@ -153,6 +153,12 @@ export function loadStoredState(): AppStateData {
       settings: {
         ...initial.settings,
         ...(parsed.settings || {}),
+        userName:
+          parsed.settings?.userName &&
+          parsed.settings.userName !== 'Abdul' &&
+          parsed.settings.userName !== 'User'
+            ? parsed.settings.userName
+            : 'Guest',
         madhab: parsed.settings?.madhab || 'shafii'
       },
       prayerTimes: Array.isArray(parsed.prayerTimes) && parsed.prayerTimes.length ? parsed.prayerTimes : initial.prayerTimes,
