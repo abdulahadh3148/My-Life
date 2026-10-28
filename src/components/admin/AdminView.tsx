@@ -104,16 +104,16 @@ export const AdminView: React.FC = () => {
 
   // Handle role toggle
   const handleToggleRole = async (user: ManagedUser) => {
-    const nextRole = user.role === 'admin' ? 'user' : 'admin';
-    const updated = users.map(u => u.uid === user.uid ? { ...u, role: nextRole } : u);
+    const nextRole: 'admin' | 'user' = user.role === 'admin' ? 'user' : 'admin';
+    const updated: ManagedUser[] = users.map(u => (u.uid === user.uid ? { ...u, role: nextRole } : u));
     setUsers(updated);
     await updateManagedUserInCloud(user.uid, { role: nextRole });
   };
 
   // Handle status toggle (active <-> suspended)
   const handleToggleStatus = async (user: ManagedUser) => {
-    const nextStatus = user.status === 'active' ? 'suspended' : 'active';
-    const updated = users.map(u => u.uid === user.uid ? { ...u, status: nextStatus } : u);
+    const nextStatus: 'active' | 'suspended' = user.status === 'active' ? 'suspended' : 'active';
+    const updated: ManagedUser[] = users.map(u => (u.uid === user.uid ? { ...u, status: nextStatus } : u));
     setUsers(updated);
     await updateManagedUserInCloud(user.uid, { status: nextStatus });
   };
