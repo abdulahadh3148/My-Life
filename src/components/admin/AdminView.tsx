@@ -29,7 +29,7 @@ import {
 } from '../../services/firebase';
 
 export const AdminView: React.FC = () => {
-  const { currentUser, explorerPlaces = [], activities = [] } = useApp();
+  const { currentUser, explorerPlaces = [], activities = [], isAdminUser, setActiveView } = useApp();
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,29 @@ export const AdminView: React.FC = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
 
+  // Strictly block unauthorized users from viewing the admin dashboard
+  if (!isAdminUser) {
+    return (
+      <div className="p-8 text-center space-y-4 max-w-md mx-auto my-16 bg-white dark:bg-[#121824] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl animate-in fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white">
+          Access Restricted
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          The Admin Panel is strictly confidential and reserved exclusively for the <strong>ERANGA DRIVING SCHOOL</strong> account (<em>erangadrivingschool@gmail.com</em>).
+        </p>
+        <button
+          onClick={() => setActiveView('dashboard')}
+          className="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold transition-all shadow-md hover:opacity-90"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   // Load registered users
   const loadUsers = async () => {
     setLoading(true);
@@ -54,8 +77,8 @@ export const AdminView: React.FC = () => {
       if (currentUser && !list.some(u => u.uid === currentUser.uid)) {
         const selfUser: ManagedUser = {
           uid: currentUser.uid,
-          email: currentUser.email || 'abdul@mylife.app',
-          displayName: currentUser.displayName || 'Abdul Ahad',
+          email: currentUser.email || 'erangadrivingschool@gmail.com',
+          displayName: currentUser.displayName || 'Eranga DrivingSchool',
           photoURL: currentUser.photoURL || null,
           role: 'admin',
           status: 'active',
@@ -393,15 +416,15 @@ export const AdminView: React.FC = () => {
               <button
                 onClick={() => {
                   const demoUser: ManagedUser = {
-                    uid: `demo-${Date.now()}`,
-                    email: 'abdulahadh@gmail.com',
-                    displayName: 'Abdul Ahad',
+                    uid: `admin-${Date.now()}`,
+                    email: 'erangadrivingschool@gmail.com',
+                    displayName: 'Eranga DrivingSchool',
                     role: 'admin',
                     status: 'active',
                     createdAt: new Date().toISOString(),
                     lastLoginAt: new Date().toISOString(),
-                    placesCount: 2,
-                    activitiesCount: 5
+                    placesCount: explorerPlaces.length,
+                    activitiesCount: activities.length
                   };
                   setUsers([demoUser]);
                   updateManagedUserInCloud(demoUser.uid, demoUser);

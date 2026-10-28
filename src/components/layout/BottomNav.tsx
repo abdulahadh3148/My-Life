@@ -20,7 +20,7 @@ import {
 import { useApp, NavView } from '../../context/AppContext';
 
 export const BottomNav: React.FC = () => {
-  const { activeView, setActiveView, setIsQuickAddOpen } = useApp();
+  const { activeView, setActiveView, setIsQuickAddOpen, isAdminUser } = useApp();
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const moreItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -32,7 +32,7 @@ export const BottomNav: React.FC = () => {
     { id: 'growth', label: 'Personal Growth', icon: GraduationCap },
     { id: 'weekly', label: 'Weekly Planner', icon: CalendarDays },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
-    { id: 'admin', label: 'Admin Panel', icon: ShieldCheck },
+    ...(isAdminUser ? [{ id: 'admin' as NavView, label: 'Admin Panel', icon: ShieldCheck }] : []),
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 

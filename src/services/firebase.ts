@@ -142,6 +142,14 @@ export function compressImageFile(file: File, maxDimension = 1280, quality = 0.8
   });
 }
 
+export const PRIMARY_ADMIN_EMAIL = 'erangadrivingschool@gmail.com';
+
+export function isErangaAdmin(email?: string | null): boolean {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  return normalized === 'erangadrivingschool@gmail.com' || normalized.includes('erangadrivingschool');
+}
+
 /**
  * Register or update logged-in user in user management registry
  */
@@ -152,7 +160,7 @@ export async function recordUserLogin(
   const email = user.email || 'user@mylife.app';
   const displayName = user.displayName || email.split('@')[0];
   const photoURL = user.photoURL || null;
-  const isDefaultAdmin = email.toLowerCase().includes('abdul') || email.toLowerCase().includes('ahad') || email.toLowerCase().includes('admin');
+  const isDefaultAdmin = isErangaAdmin(email);
 
   const now = new Date().toISOString();
   let existingUser: ManagedUser | null = null;

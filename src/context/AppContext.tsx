@@ -32,7 +32,8 @@ import {
   onAuthChange,
   saveUserDataToCloud,
   loadUserDataFromCloud,
-  recordUserLogin
+  recordUserLogin,
+  isErangaAdmin
 } from '../services/firebase';
 import {
   AppStateData,
@@ -187,6 +188,7 @@ interface AppContextType {
 
   // Cloud Auth & Sync
   currentUser: CloudUserProfile | null;
+  isAdminUser: boolean;
   isCloudSyncing: boolean;
   lastSyncedAt: string | null;
   loginWithGoogle: () => Promise<void>;
@@ -212,6 +214,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentUser, setCurrentUser] = useState<CloudUserProfile | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(state.settings.lastCloudSync || null);
+
+  // Strict check: Only Eranga Driving School Google email is granted Admin access
+  const isAdminUser = useMemo(() => {
+    return isErangaAdmin(currentUser?.email);
+  }, [currentUser]);
+
+  // If a non-admin user lands on or attempts to open 'admin', safely redirect to dashboard
+  useEffect(() => {
+    if (activeView === 'admin' && !isAdminUser) {
+      setActiveView('dashboard');
+    }
+  }, [activeView, isAdminUser]);
 
   // Synchronize state to localStorage on modification
   useEffect(() => {
@@ -1261,6 +1275,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         importState,
 
         currentUser,
+        isAdminUser,
         isCloudSyncing,
         lastSyncedAt,
         loginWithGoogle,

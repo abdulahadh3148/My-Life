@@ -35,6 +35,7 @@ export const AppLayout: React.FC = () => {
     setIsNotificationCenterOpen,
     isLoginModalOpen,
     setIsLoginModalOpen,
+    isAdminUser,
     selectedDate
   } = useApp();
 
@@ -65,7 +66,7 @@ export const AppLayout: React.FC = () => {
       case 'settings':
         return <SettingsView />;
       case 'admin':
-        return <AdminView />;
+        return isAdminUser ? <AdminView /> : <DashboardView />;
       default:
         return <DashboardView />;
     }

@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { activeView, setActiveView, todayActivities, setIsBalancerOpen } = useApp();
+  const { activeView, setActiveView, todayActivities, setIsBalancerOpen, isAdminUser } = useApp();
   const [collapsed, setCollapsed] = useState(false);
 
   const conflicts = detectOverlaps(todayActivities);
@@ -46,7 +46,7 @@ export const Sidebar: React.FC = () => {
     { id: 'growth', label: 'Personal Growth', icon: GraduationCap },
     { id: 'weekly', label: 'Weekly Planner', icon: CalendarDays },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
-    { id: 'admin', label: 'Admin Panel', icon: ShieldCheck, badge: 'Users' },
+    ...(isAdminUser ? [{ id: 'admin' as NavView, label: 'Admin Panel', icon: ShieldCheck, badge: 'Users' }] : []),
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
